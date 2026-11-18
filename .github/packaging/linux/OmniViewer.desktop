@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Omni Viewer
+Exec=OmniViewer
+Icon=omni-viewer
+StartupWMClass=com.cgvsu.Simple3DViewer
+Categories=Graphics;3DGraphics;
+Terminal=false

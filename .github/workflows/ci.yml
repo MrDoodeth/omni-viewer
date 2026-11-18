@@ -1,0 +1,88 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven
+      - name: Run Java tests (Linux)
+        if: runner.os == 'Linux'
+        run: ./mvnw -B -ntp verify
+      - name: Run Java tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./mvnw.cmd -B -ntp verify
+
+  package:
+    name: Package (${{ matrix.os }})
+    needs: test
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven
+      - name: Build application and collect dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./mvnw -B -ntp -Pportable -DskipTests package
+      - name: Build application and collect dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./mvnw.cmd -B -ntp -Pportable -DskipTests package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omni-viewer-${{ matrix.os }}
+          path: target/dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish release
+    needs: package
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish both artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          test -s dist/OmniViewer-linux-x86_64.AppImage
+          test -s dist/OmniViewer-windows-x64.exe
+          gh release create "$TAG" dist/OmniViewer-linux-x86_64.AppImage dist/OmniViewer-windows-x64.exe --verify-tag --generate-notes
