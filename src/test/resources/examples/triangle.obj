@@ -1,0 +1,5 @@
+# Small sample model for smoke testing.
+v -10 -10 0
+v 10 -10 0
+v 0 10 0
+f 1 2 3
