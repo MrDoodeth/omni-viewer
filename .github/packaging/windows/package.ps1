@@ -28,7 +28,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $archive = Join-Path $work 'nsis.zip'
 Invoke-WebRequest 'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip' -OutFile $archive
-if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8') { throw 'NSIS SHA-256 mismatch' }
+$hashOutput = & certutil.exe -hashfile $archive SHA256
+if ($LASTEXITCODE -ne 0) { throw 'Could not calculate NSIS archive SHA-256' }
+$actualHash = ($hashOutput | Where-Object { $_ -match '^([0-9a-fA-F]{2}\s*){32}$' } | Select-Object -First 1) -replace '\s', ''
+if ($actualHash -ne 'ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8') { throw "NSIS SHA-256 mismatch: $actualHash" }
 Expand-Archive $archive -DestinationPath $work
 $exe = Join-Path $work 'OmniViewer-windows-x64.exe'
 & (Join-Path $work 'nsis-3.13\makensis.exe') "/DAPP_IMAGE=$imageDir\OmniViewer" "/DOUTPUT=$exe" "/DICON=$ico" '.github/packaging/windows/portable.nsi'
