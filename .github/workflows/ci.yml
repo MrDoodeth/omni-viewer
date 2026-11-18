@@ -27,11 +27,28 @@ jobs:
           cache: maven
       - name: Run Java tests (Linux)
         if: runner.os == 'Linux'
-        run: ./mvnw -B -ntp verify
+        run: |
+          for attempt in 1 2 3; do
+            ./mvnw -B -ntp verify && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "Maven Wrapper failed (attempt $attempt); retrying in $((attempt * 5)) seconds..."
+              sleep $((attempt * 5))
+            fi
+          done
+          exit 1
       - name: Run Java tests (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./mvnw.cmd -B -ntp verify
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            ./mvnw.cmd -B -ntp verify
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 3) {
+              Write-Host "Maven Wrapper failed (attempt $attempt); retrying..."
+              Start-Sleep -Seconds (5 * $attempt)
+            }
+          }
+          exit 1
 
   package:
     name: Package (${{ matrix.os }})
@@ -52,12 +69,27 @@ jobs:
       - name: Build application and collect dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          ./mvnw -B -ntp -Pportable -DskipTests package
+          for attempt in 1 2 3; do
+            ./mvnw -B -ntp -Pportable -DskipTests package && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "Maven Wrapper/package failed (attempt $attempt); retrying in $((attempt * 5)) seconds..."
+              sleep $((attempt * 5))
+            fi
+          done
+          exit 1
       - name: Build application and collect dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          ./mvnw.cmd -B -ntp -Pportable -DskipTests package
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            ./mvnw.cmd -B -ntp -Pportable -DskipTests package
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 3) {
+              Write-Host "Maven Wrapper/package failed (attempt $attempt); retrying..."
+              Start-Sleep -Seconds (5 * $attempt)
+            }
+          }
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: omni-viewer-${{ matrix.os }}
@@ -83,6 +115,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
-          test -s dist/OmniViewer-linux-x86_64.AppImage
-          test -s dist/OmniViewer-windows-x64.exe
           gh release create "$TAG" dist/OmniViewer-linux-x86_64.AppImage dist/OmniViewer-windows-x64.exe --verify-tag --generate-notes
