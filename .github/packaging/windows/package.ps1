@@ -28,16 +28,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $archive = Join-Path $work 'nsis.zip'
 $expectedHash = 'ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8'
-$downloadUrls = @(
-    'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip',
-    'https://prdownloads.sourceforge.net/nsis/nsis-3.13.zip?download'
-)
+$downloadUrl = 'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip'
 $downloaded = $false
 for ($attempt = 1; $attempt -le 5; $attempt++) {
     Remove-Item $archive -Force -ErrorAction SilentlyContinue
     try {
-        $downloadUrl = $downloadUrls[($attempt - 1) % $downloadUrls.Count]
-        Invoke-WebRequest $downloadUrl -OutFile $archive -TimeoutSec 120
+        & curl.exe --fail --location --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 --max-time 120 --output $archive $downloadUrl
+        if ($LASTEXITCODE -ne 0) { throw "curl.exe exited with code $LASTEXITCODE" }
         $hashOutput = & certutil.exe -hashfile $archive SHA256
         if ($LASTEXITCODE -ne 0) { throw 'certutil could not calculate the archive SHA-256' }
         $actualHash = ($hashOutput | Where-Object { $_ -match '^([0-9a-fA-F]{2}\s*){32}$' } | Select-Object -First 1) -replace '\s', ''
